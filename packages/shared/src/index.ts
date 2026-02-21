@@ -38,3 +38,16 @@ export interface Room {
   createdAt: number;
   lastActivity: number;
 }
+
+// Export game engine functions
+export {
+  createBoard,
+  placeShip,
+  resolveShot,
+  checkWin,
+  type Orientation,
+  type ShotResult,
+  type PlacementError,
+  type PlacementSuccess,
+  type PlacementResult
+} from './gameEngine';
