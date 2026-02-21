@@ -1,0 +1,21 @@
+{
+  "name": "battleship-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "npm run dev --workspace=@battleship/client",
+    "dev:server": "npm run dev --workspace=@battleship/server",
+    "build": "npm run build --workspaces",
+    "build:client": "npm run build --workspace=@battleship/client",
+    "build:server": "npm run build --workspace=@battleship/server",
+    "lint": "npm run lint --workspaces",
+    "type-check": "npm run type-check --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
