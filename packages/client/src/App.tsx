@@ -16,7 +16,7 @@ interface RoomState {
 }
 
 function App() {
-  const { socket, connected } = useSocket();
+  const { socket, connected, reconnecting, saveRoomCode, clearSession } = useSocket();
   const [screen, setScreen] = useState<Screen>('home');
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string>('');
@@ -26,24 +26,27 @@ function App() {
   const [playerShips, setPlayerShips] = useState<Ship[]>([]);
   const [opponentBoard, setOpponentBoard] = useState<Cell[][] | null>(null);
   const [opponentShips, setOpponentShips] = useState<Ship[]>([]);
+  const [currentTurn, setCurrentTurn] = useState<string>('');
 
   useEffect(() => {
     if (!socket) return;
 
     // Room created successfully
-    socket.on('room-created', (data: { code: string }) => {
+    socket.on('room-created', (data: { code: string; sessionId?: string }) => {
       console.log('Room created:', data.code);
       setRoomState({ code: data.code, playerCount: 1 });
       setScreen('room');
       setError('');
+      saveRoomCode(data.code);
     });
 
     // Successfully joined a room
-    socket.on('room-joined', (data: { code: string; playerCount: number }) => {
-      console.log('Room joined:', data.code, 'players:', data.playerCount);
-      setRoomState({ code: data.code, playerCount: data.playerCount });
+    socket.on('room-joined', (data: { code: string; sessionId?: string }) => {
+      console.log('Room joined:', data.code);
+      setRoomState({ code: data.code, playerCount: 2 });
       setScreen('room');
       setError('');
+      saveRoomCode(data.code);
     });
 
     // Player joined the room
@@ -59,15 +62,57 @@ function App() {
     });
 
     // Error joining room
-    socket.on('join-error', (data: { message: string }) => {
-      console.error('Join error:', data.message);
+    socket.on('error', (data: { message: string }) => {
+      console.error('Error:', data.message);
       setError(data.message);
     });
 
     // Both players ready, transition to placement
-    socket.on('start-placement', () => {
+    socket.on('phase:placement', () => {
       console.log('Starting placement phase');
       setScreen('pvp-placement');
+    });
+
+    // Battle phase started
+    socket.on('phase:battle', (data: { currentTurn: string; isYourTurn: boolean }) => {
+      console.log('Battle phase started, your turn:', data.isYourTurn);
+      setCurrentTurn(data.currentTurn);
+      setScreen('battle');
+    });
+
+    // Reconnection successful - restore game state
+    socket.on('reconnect-success', (data: {
+      roomCode: string;
+      phase: string;
+      yourBoard: Cell[][];
+      yourShips: Ship[];
+      ready: boolean;
+      currentTurn: string;
+      isYourTurn: boolean;
+      opponentShots: Array<{row: number; col: number; hit: boolean}>;
+      playerShots: Array<{row: number; col: number; hit: boolean}>;
+    }) => {
+      console.log('Reconnected successfully, restoring game state:', data);
+      setRoomState({ code: data.roomCode, playerCount: 2 });
+      setPlayerBoard(data.yourBoard);
+      setPlayerShips(data.yourShips);
+      setCurrentTurn(data.currentTurn);
+      
+      // Restore opponent board with player shots
+      const emptyBoard = Array(10).fill(null).map(() => 
+        Array(10).fill(null).map(() => ({ ship: null, hit: false }))
+      );
+      data.playerShots.forEach(shot => {
+        emptyBoard[shot.row][shot.col] = { ship: null, hit: true };
+      });
+      setOpponentBoard(emptyBoard);
+      
+      // Navigate to appropriate screen
+      if (data.phase === 'waiting' || data.phase === 'placement') {
+        setScreen(data.ready ? 'room' : 'pvp-placement');
+      } else if (data.phase === 'battle') {
+        setScreen('battle');
+      }
     });
 
     return () => {
@@ -75,10 +120,12 @@ function App() {
       socket.off('room-joined');
       socket.off('player-joined');
       socket.off('player-left');
-      socket.off('join-error');
-      socket.off('start-placement');
+      socket.off('error');
+      socket.off('phase:placement');
+      socket.off('phase:battle');
+      socket.off('reconnect-success');
     };
-  }, [socket]);
+  }, [socket, saveRoomCode]);
 
   const handlePlayAI = () => {
     setScreen('ai-placement');
@@ -112,11 +159,13 @@ function App() {
     setRoomState(null);
     setScreen('online-lobby');
     setError('');
+    clearSession();
   };
 
   const handleBackToHome = () => {
     setScreen('home');
     setError('');
+    clearSession();
   };
 
   const handleAIPlacementReady = (board: Cell[][], ships: Ship[]) => {
@@ -159,12 +208,14 @@ function App() {
     return (
       <div className="fixed top-4 right-4 z-50">
         <div className={`flex items-center gap-2 px-3 py-2 rounded-full text-xs font-medium ${
-          connected 
+          reconnecting
+            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+            : connected 
             ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
             : 'bg-red-500/20 text-red-400 border border-red-500/30'
         }`}>
-          <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span>{connected ? 'Connected' : 'Disconnected'}</span>
+          <div className={`w-2 h-2 rounded-full ${reconnecting ? 'bg-yellow-500 animate-pulse' : connected ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span>{reconnecting ? 'Reconnecting...' : connected ? 'Connected' : 'Disconnected'}</span>
         </div>
       </div>
     );
@@ -216,13 +267,17 @@ function App() {
 
       {screen === 'battle' && playerBoard && playerShips.length > 0 && (
         <BattlePhase
-          mode="ai"
+          mode={roomState ? 'pvp' : 'ai'}
           playerBoard={playerBoard}
           playerShips={playerShips}
           opponentBoard={opponentBoard || undefined}
           opponentShips={opponentShips}
+          roomCode={roomState?.code}
+          socket={socket}
+          initialTurn={currentTurn}
           onGameEnd={(winner) => {
             console.log('Game ended, winner:', winner);
+            clearSession();
           }}
           onBackToHome={handleBackToHome}
         />
