@@ -3,8 +3,10 @@ import { useSocket } from './hooks/useSocket.ts';
 import { HomeScreen } from './components/HomeScreen.tsx';
 import { OnlineLobby } from './components/OnlineLobby.tsx';
 import { RoomView } from './components/RoomView.tsx';
+import { ShipPlacement } from './components/ShipPlacement.tsx';
+import type { Cell, Ship } from '@battleship/shared';
 
-type Screen = 'home' | 'online-lobby' | 'room' | 'ai-game' | 'placement' | 'battle';
+type Screen = 'home' | 'online-lobby' | 'room' | 'ai-placement' | 'pvp-placement' | 'battle';
 
 interface RoomState {
   code: string;
@@ -57,7 +59,7 @@ function App() {
     // Both players ready, transition to placement
     socket.on('start-placement', () => {
       console.log('Starting placement phase');
-      setScreen('placement');
+      setScreen('pvp-placement');
     });
 
     return () => {
@@ -71,8 +73,7 @@ function App() {
   }, [socket]);
 
   const handlePlayAI = () => {
-    setScreen('ai-game');
-    // TODO: Initialize AI game
+    setScreen('ai-placement');
   };
 
   const handlePlayOnline = () => {
@@ -108,6 +109,28 @@ function App() {
   const handleBackToHome = () => {
     setScreen('home');
     setError('');
+  };
+
+  const handleAIPlacementReady = (board: Cell[][], ships: Ship[]) => {
+    console.log('AI placement ready:', { board, ships });
+    // TODO: Start AI battle with the placed ships
+    setScreen('battle');
+  };
+
+  const handlePvPPlacementReady = (board: Cell[][], ships: Ship[]) => {
+    console.log('PvP placement ready:', { board, ships });
+    if (socket && roomState) {
+      // TODO: Send placement to server
+      socket.emit('placement-ready', { code: roomState.code, board, ships });
+    }
+  };
+
+  const handlePlacementCancel = () => {
+    if (screen === 'ai-placement') {
+      setScreen('home');
+    } else if (screen === 'pvp-placement') {
+      handleLeaveRoom();
+    }
   };
 
   // Connection status indicator
@@ -156,25 +179,26 @@ function App() {
         />
       )}
 
-      {screen === 'ai-game' && (
-        <div className="min-h-screen bg-gradient-to-br from-blue-900 via-gray-900 to-blue-900 text-white flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-4">AI Game Mode</h1>
-            <p className="text-gray-400 mb-4">Coming soon...</p>
-            <button
-              onClick={handleBackToHome}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition"
-            >
-              Back to Home
-            </button>
-          </div>
-        </div>
+      {screen === 'ai-placement' && (
+        <ShipPlacement
+          mode="ai"
+          onReady={handleAIPlacementReady}
+          onCancel={handlePlacementCancel}
+        />
       )}
 
-      {screen === 'placement' && (
+      {screen === 'pvp-placement' && (
+        <ShipPlacement
+          mode="pvp"
+          onReady={handlePvPPlacementReady}
+          onCancel={handlePlacementCancel}
+        />
+      )}
+
+      {screen === 'battle' && (
         <div className="min-h-screen bg-gradient-to-br from-blue-900 via-gray-900 to-blue-900 text-white flex items-center justify-center">
           <div className="text-center">
-            <h1 className="text-3xl font-bold mb-4">Ship Placement</h1>
+            <h1 className="text-3xl font-bold mb-4">Battle Phase</h1>
             <p className="text-gray-400 mb-4">Coming soon...</p>
             <button
               onClick={handleBackToHome}
