@@ -51,3 +51,10 @@ export {
   type PlacementSuccess,
   type PlacementResult
 } from './gameEngine';
+
+// Export AI opponent
+export {
+  AIOpponent,
+  type ShotHistory,
+  type AIState
+} from './aiOpponent';
