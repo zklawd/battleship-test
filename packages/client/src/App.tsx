@@ -4,6 +4,8 @@ import { HomeScreen } from './components/HomeScreen.tsx';
 import { OnlineLobby } from './components/OnlineLobby.tsx';
 import { RoomView } from './components/RoomView.tsx';
 import { ShipPlacement } from './components/ShipPlacement.tsx';
+import { BattlePhase } from './components/BattlePhase.tsx';
+import { AIOpponent } from '@battleship/shared';
 import type { Cell, Ship } from '@battleship/shared';
 
 type Screen = 'home' | 'online-lobby' | 'room' | 'ai-placement' | 'pvp-placement' | 'battle';
@@ -18,6 +20,12 @@ function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [error, setError] = useState<string>('');
+  
+  // Battle state
+  const [playerBoard, setPlayerBoard] = useState<Cell[][] | null>(null);
+  const [playerShips, setPlayerShips] = useState<Ship[]>([]);
+  const [opponentBoard, setOpponentBoard] = useState<Cell[][] | null>(null);
+  const [opponentShips, setOpponentShips] = useState<Ship[]>([]);
 
   useEffect(() => {
     if (!socket) return;
@@ -113,7 +121,18 @@ function App() {
 
   const handleAIPlacementReady = (board: Cell[][], ships: Ship[]) => {
     console.log('AI placement ready:', { board, ships });
-    // TODO: Start AI battle with the placed ships
+    
+    // Set player's board and ships
+    setPlayerBoard(board);
+    setPlayerShips(ships);
+    
+    // Create AI opponent and place its ships
+    const ai = new AIOpponent();
+    const aiPlacement = ai.placeShipsRandomly();
+    setOpponentBoard(aiPlacement.board);
+    setOpponentShips(aiPlacement.ships);
+    
+    // Start battle
     setScreen('battle');
   };
 
@@ -195,19 +214,18 @@ function App() {
         />
       )}
 
-      {screen === 'battle' && (
-        <div className="min-h-screen bg-gradient-to-br from-blue-900 via-gray-900 to-blue-900 text-white flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold mb-4">Battle Phase</h1>
-            <p className="text-gray-400 mb-4">Coming soon...</p>
-            <button
-              onClick={handleBackToHome}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg transition"
-            >
-              Back to Home
-            </button>
-          </div>
-        </div>
+      {screen === 'battle' && playerBoard && playerShips.length > 0 && (
+        <BattlePhase
+          mode="ai"
+          playerBoard={playerBoard}
+          playerShips={playerShips}
+          opponentBoard={opponentBoard || undefined}
+          opponentShips={opponentShips}
+          onGameEnd={(winner) => {
+            console.log('Game ended, winner:', winner);
+          }}
+          onBackToHome={handleBackToHome}
+        />
       )}
     </>
   );
