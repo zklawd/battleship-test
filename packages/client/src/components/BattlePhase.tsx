@@ -9,6 +9,7 @@ interface BattlePhaseProps {
   opponentShips?: Ship[]; // Only for AI mode
   roomCode?: string; // Only for PvP mode
   socket?: any; // Only for PvP mode
+  initialTurn?: string; // Only for PvP mode
   onGameEnd: (winner: 'player' | 'opponent') => void;
   onBackToHome: () => void;
 }
@@ -29,6 +30,7 @@ export function BattlePhase({
   opponentShips: initialOpponentShips,
   roomCode,
   socket,
+  initialTurn,
   onBackToHome
 }: BattlePhaseProps) {
   // Game state
@@ -36,11 +38,16 @@ export function BattlePhase({
   const [playerShips, setPlayerShips] = useState(initialPlayerShips);
   const [opponentBoard, setOpponentBoard] = useState(initialOpponentBoard || createEmptyBoard());
   const [opponentShips, setOpponentShips] = useState<Ship[]>(initialOpponentShips || []);
-  const [isPlayerTurn, setIsPlayerTurn] = useState(true);
+  const [isPlayerTurn, setIsPlayerTurn] = useState(initialTurn ? initialTurn === socket?.id : true);
   const [gameOver, setGameOver] = useState(false);
   const [winner, setWinner] = useState<'player' | 'opponent' | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [mobileView, setMobileView] = useState<GridView>('opponent');
+  
+  // Opponent disconnection state
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const [disconnectCountdown, setDisconnectCountdown] = useState(60);
+  const [disconnectReason, setDisconnectReason] = useState<string | null>(null);
   
   // AI state (only for AI mode)
   const [aiOpponent] = useState(() => mode === 'ai' ? new AIOpponent() : null);
@@ -50,16 +57,36 @@ export function BattlePhase({
     if (mode === 'pvp' && socket) {
       // Set up PvP socket listeners
       socket.on('shot-result', handleOpponentShot);
+      socket.on('opponent-shot', handleOpponentShot);
       socket.on('game-over', handlePvPGameOver);
-      socket.on('turn-change', handleTurnChange);
+      socket.on('turn-changed', handleTurnChange);
+      socket.on('opponent-disconnected', handleOpponentDisconnected);
+      socket.on('opponent-reconnected', handleOpponentReconnected);
       
       return () => {
         socket.off('shot-result');
+        socket.off('opponent-shot');
         socket.off('game-over');
-        socket.off('turn-change');
+        socket.off('turn-changed');
+        socket.off('opponent-disconnected');
+        socket.off('opponent-reconnected');
       };
     }
   }, [mode, socket]);
+
+  // Countdown timer for opponent disconnection
+  useEffect(() => {
+    if (opponentDisconnected && disconnectCountdown > 0) {
+      const timer = setTimeout(() => {
+        setDisconnectCountdown(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (opponentDisconnected && disconnectCountdown === 0) {
+      // Countdown expired, opponent forfeited
+      setDisconnectReason('Opponent forfeited');
+      endGame('player');
+    }
+  }, [opponentDisconnected, disconnectCountdown]);
 
   function createEmptyBoard(): Cell[][] {
     const board: Cell[][] = [];
@@ -94,12 +121,28 @@ export function BattlePhase({
     }
   }
 
-  function handlePvPGameOver(data: { winner: string }) {
+  function handlePvPGameOver(data: { winner: string; reason?: string }) {
+    if (data.reason === 'opponent-forfeit') {
+      setDisconnectReason('You win! Opponent forfeited');
+    }
     endGame(data.winner === socket.id ? 'player' : 'opponent');
   }
 
-  function handleTurnChange(data: { currentTurn: string }) {
-    setIsPlayerTurn(data.currentTurn === socket?.id);
+  function handleTurnChange(data: { currentTurn: string; isYourTurn: boolean }) {
+    setIsPlayerTurn(data.isYourTurn);
+  }
+
+  function handleOpponentDisconnected(data: { disconnectTime: number }) {
+    console.log('Opponent disconnected at:', data.disconnectTime);
+    setOpponentDisconnected(true);
+    setDisconnectCountdown(60);
+  }
+
+  function handleOpponentReconnected() {
+    console.log('Opponent reconnected');
+    setOpponentDisconnected(false);
+    setDisconnectCountdown(60);
+    showToast('Opponent reconnected', 'info');
   }
 
   function handleCellClick(row: number, col: number) {
@@ -188,13 +231,11 @@ export function BattlePhase({
   function handlePvPShot(row: number, col: number) {
     if (socket && roomCode) {
       // Emit shot to server
-      socket.emit('fire-shot', { code: roomCode, row, col });
+      socket.emit('fire', { row, col });
       
       // Server will respond with shot-result event
-      socket.once('shot-result', (data: { hit: boolean; sunk: boolean; shipName?: string; alreadyFired: boolean }) => {
-        if (data.alreadyFired) return;
-
-        // Update opponent board optimistically
+      socket.once('shot-result', (data: { hit: boolean; sunk: boolean; shipName?: string }) => {
+        // Update opponent board
         const newBoard = opponentBoard.map((r, rIdx) =>
           r.map((cell, cIdx) => {
             if (rIdx === row && cIdx === col) {
@@ -209,8 +250,7 @@ export function BattlePhase({
           showToast(`${data.shipName} Sunk!`, 'sunk');
         }
 
-        // Turn will be managed by turn-change event
-        setIsPlayerTurn(false);
+        // Turn will be managed by turn-changed event
       });
     }
   }
@@ -231,15 +271,15 @@ export function BattlePhase({
 
   function renderGrid(board: Cell[][], _ships: Ship[], isOpponent: boolean) {
     return (
-      <div className="inline-block bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-        <div className="grid grid-cols-10 gap-1">
+      <div className="inline-block bg-gray-800/50 p-2 sm:p-4 rounded-lg border border-gray-700 max-w-full">
+        <div className="grid grid-cols-10 gap-0.5 sm:gap-1">
           {board.map((row, rowIdx) =>
             row.map((cell, colIdx) => {
               const isHit = cell.hit;
               const hasShip = cell.ship !== null;
               const showShip = !isOpponent || gameOver; // Show ships on player board or when game is over
               
-              let bgColor = 'bg-blue-600/30 hover:bg-blue-500/40';
+              let bgColor = 'bg-blue-600/30 hover:bg-blue-500/40 active:bg-blue-600/60';
               let content = null;
               let cursor = 'cursor-default';
 
@@ -254,7 +294,7 @@ export function BattlePhase({
                   // Hit
                   bgColor = 'bg-red-600';
                   content = (
-                    <div className="text-white font-bold text-lg" aria-label="Hit">
+                    <div className="text-white font-bold text-base sm:text-lg" aria-label="Hit">
                       ✕
                     </div>
                   );
@@ -262,7 +302,7 @@ export function BattlePhase({
                   // Miss
                   bgColor = 'bg-gray-400';
                   content = (
-                    <div className="text-white font-bold text-lg" aria-label="Miss">
+                    <div className="text-white font-bold text-base sm:text-lg" aria-label="Miss">
                       ○
                     </div>
                   );
@@ -278,7 +318,8 @@ export function BattlePhase({
               return (
                 <div
                   key={`${rowIdx}-${colIdx}`}
-                  className={`w-8 h-8 md:w-10 md:h-10 ${bgColor} ${cursor} border border-gray-600 flex items-center justify-center transition-colors duration-150 rounded`}
+                  className={`${bgColor} ${cursor} border border-gray-600 flex items-center justify-center transition-colors duration-150 rounded touch-manipulation`}
+                  style={{ width: '44px', height: '44px', minWidth: '44px', minHeight: '44px' }}
                   onClick={() => isOpponent && handleCellClick(rowIdx, colIdx)}
                   role={isClickable ? 'button' : undefined}
                   aria-label={isClickable ? `Fire at row ${rowIdx + 1}, column ${colIdx + 1}` : undefined}
@@ -325,7 +366,7 @@ export function BattlePhase({
               {winner === 'player' ? '🎉 Victory!' : '💥 Defeat'}
             </h1>
             <p className="text-xl text-gray-300 mb-8">
-              {winner === 'player' ? 'You sank all enemy ships!' : 'All your ships have been sunk!'}
+              {disconnectReason || (winner === 'player' ? 'You sank all enemy ships!' : 'All your ships have been sunk!')}
             </p>
           </div>
 
@@ -342,16 +383,18 @@ export function BattlePhase({
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-wrap gap-4 justify-center">
             <button
               onClick={onBackToHome}
-              className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg transition"
+              className="bg-gray-600 hover:bg-gray-700 active:bg-gray-800 text-white font-bold py-3 px-8 rounded-lg transition touch-manipulation"
+              style={{ minHeight: '44px' }}
             >
               Home
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition"
+              className="bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition touch-manipulation"
+              style={{ minHeight: '44px' }}
             >
               Play Again
             </button>
@@ -374,17 +417,40 @@ export function BattlePhase({
           )}
         </div>
         
+        {/* Opponent disconnection warning */}
+        {opponentDisconnected && (
+          <div className="mb-4 p-4 bg-yellow-500/20 border-2 border-yellow-500 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse"></div>
+                  <span className="text-yellow-400 font-semibold">Opponent disconnected</span>
+                </div>
+                <span className="text-gray-300">- waiting</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-2xl font-bold font-mono text-yellow-400">{disconnectCountdown}s</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Turn indicator */}
-        <div className="text-center py-3 rounded-lg border-2 border-dashed" 
-          style={{
-            borderColor: isPlayerTurn ? '#22c55e' : '#ef4444',
-            backgroundColor: isPlayerTurn ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'
-          }}
-        >
-          <p className="text-lg font-semibold" style={{ color: isPlayerTurn ? '#22c55e' : '#ef4444' }}>
-            {isPlayerTurn ? '🎯 Your Turn' : '⏳ Opponent\'s Turn'}
-          </p>
-        </div>
+        {!opponentDisconnected && (
+          <div className="text-center py-3 rounded-lg border-2 border-dashed" 
+            style={{
+              borderColor: isPlayerTurn ? '#22c55e' : '#ef4444',
+              backgroundColor: isPlayerTurn ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)'
+            }}
+          >
+            <p className="text-lg font-semibold" style={{ color: isPlayerTurn ? '#22c55e' : '#ef4444' }}>
+              {isPlayerTurn ? '🎯 Your Turn' : '⏳ Opponent\'s Turn'}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Mobile view tabs (only on small screens) */}
@@ -392,21 +458,23 @@ export function BattlePhase({
         <div className="flex gap-2 bg-gray-800/50 p-1 rounded-lg border border-gray-700">
           <button
             onClick={() => setMobileView('opponent')}
-            className={`flex-1 py-2 px-4 rounded transition ${
+            className={`flex-1 py-3 px-4 rounded transition font-semibold touch-manipulation ${
               mobileView === 'opponent'
                 ? 'bg-blue-600 text-white'
-                : 'bg-transparent text-gray-400 hover:text-white'
+                : 'bg-transparent text-gray-400 hover:text-white active:bg-gray-700/50'
             }`}
+            style={{ minHeight: '44px' }}
           >
             Enemy Board
           </button>
           <button
             onClick={() => setMobileView('player')}
-            className={`flex-1 py-2 px-4 rounded transition ${
+            className={`flex-1 py-3 px-4 rounded transition font-semibold touch-manipulation ${
               mobileView === 'player'
                 ? 'bg-blue-600 text-white'
-                : 'bg-transparent text-gray-400 hover:text-white'
+                : 'bg-transparent text-gray-400 hover:text-white active:bg-gray-700/50'
             }`}
+            style={{ minHeight: '44px' }}
           >
             My Board
           </button>

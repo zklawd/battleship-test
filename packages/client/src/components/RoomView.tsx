@@ -21,45 +21,46 @@ export function RoomView({ roomCode, playerCount, onCancel }: RoomViewProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-gray-900 to-blue-900 text-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="bg-gray-800 rounded-lg p-8 shadow-xl">
-          <h2 className="text-2xl font-bold mb-6 text-center">
+      <div className="max-w-md w-full px-2">
+        <div className="bg-gray-800 rounded-lg p-4 sm:p-6 md:p-8 shadow-xl">
+          <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center">
             {playerCount === 1 ? 'Waiting for Opponent' : 'Room Ready!'}
           </h2>
 
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <label className="block text-sm text-gray-400 mb-2 text-center">
               Room Code
             </label>
-            <div className="bg-gray-900 rounded-lg p-6 border-2 border-blue-500">
-              <div className="text-5xl font-bold font-mono text-center tracking-wider text-blue-400 mb-4">
+            <div className="bg-gray-900 rounded-lg p-4 sm:p-6 border-2 border-blue-500">
+              <div className="text-3xl sm:text-4xl md:text-5xl font-bold font-mono text-center tracking-wider text-blue-400 mb-3 sm:mb-4 break-all">
                 {roomCode}
               </div>
               <button
                 onClick={handleCopy}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2"
+                className="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-bold py-3 px-4 sm:px-6 rounded-lg transition flex items-center justify-center gap-2 touch-manipulation"
+                style={{ minHeight: '44px' }}
               >
                 {copied ? (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    <span>Copied!</span>
+                    <span className="text-sm sm:text-base">Copied!</span>
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
-                    <span>Copy to Clipboard</span>
+                    <span className="text-sm sm:text-base">Copy to Clipboard</span>
                   </>
                 )}
               </button>
             </div>
           </div>
 
-          <div className="mb-6">
-            <div className="flex items-center justify-center gap-4">
+          <div className="mb-4 sm:mb-6">
+            <div className="flex items-center justify-center gap-4 sm:gap-6">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
                 <span className="text-sm">You</span>
@@ -72,26 +73,27 @@ export function RoomView({ roomCode, playerCount, onCancel }: RoomViewProps) {
           </div>
 
           {playerCount === 1 && (
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center gap-2 text-gray-400">
-                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <div className="text-center mb-4 sm:mb-6">
+              <div className="inline-flex items-center gap-2 text-gray-400 px-2">
+                <svg className="w-5 h-5 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span className="text-sm">Share the code with a friend to start playing</span>
+                <span className="text-xs sm:text-sm">Share the code with a friend to start playing</span>
               </div>
             </div>
           )}
 
           {playerCount === 2 && (
-            <div className="text-center mb-6 p-4 bg-green-500/20 border border-green-500 rounded-lg">
-              <span className="text-green-400 font-medium">Both players connected!</span>
+            <div className="text-center mb-4 sm:mb-6 p-3 sm:p-4 bg-green-500/20 border border-green-500 rounded-lg">
+              <span className="text-green-400 font-medium text-sm sm:text-base">Both players connected!</span>
             </div>
           )}
 
           <button
             onClick={onCancel}
-            className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition"
+            className="w-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white font-bold py-3 px-4 sm:px-6 rounded-lg transition touch-manipulation"
+            style={{ minHeight: '44px' }}
           >
             Leave Room
           </button>
