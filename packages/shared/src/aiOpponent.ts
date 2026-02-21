@@ -107,27 +107,33 @@ export class AIOpponent {
       return;
     }
 
-    const lastShot = shotHistory[shotHistory.length - 1];
+    // Only process new shots since last call
+    const newShots = shotHistory.slice(this.state.lastProcessedShotCount);
+    
+    for (const shot of newShots) {
+      // If shot was a hit and not yet sunk
+      if (shot.hit && !shot.sunk) {
+        // Switch to target mode
+        this.state.mode = 'target';
+        this.state.lastHit = { row: shot.row, col: shot.col };
+        this.state.currentShipHits.push({ row: shot.row, col: shot.col });
 
-    // If last shot was a hit and not yet sunk
-    if (lastShot.hit && !lastShot.sunk) {
-      // Switch to target mode
-      this.state.mode = 'target';
-      this.state.lastHit = { row: lastShot.row, col: lastShot.col };
-      this.state.currentShipHits.push({ row: lastShot.row, col: lastShot.col });
+        // Add adjacent cells to target queue if not already fired
+        this.addAdjacentTargets(shot.row, shot.col, firedPositions);
+      }
 
-      // Add adjacent cells to target queue if not already fired
-      this.addAdjacentTargets(lastShot.row, lastShot.col, firedPositions);
+      // If shot sunk a ship
+      if (shot.sunk) {
+        // Return to hunt mode
+        this.state.mode = 'hunt';
+        this.state.targetQueue = [];
+        this.state.currentShipHits = [];
+        this.state.lastHit = null;
+      }
     }
-
-    // If last shot sunk a ship
-    if (lastShot.sunk) {
-      // Return to hunt mode
-      this.state.mode = 'hunt';
-      this.state.targetQueue = [];
-      this.state.currentShipHits = [];
-      this.state.lastHit = null;
-    }
+    
+    // Update the count of processed shots
+    this.state.lastProcessedShotCount = shotHistory.length;
   }
 
   /**
@@ -213,7 +219,8 @@ export class AIOpponent {
       mode: 'hunt',
       targetQueue: [],
       lastHit: null,
-      currentShipHits: []
+      currentShipHits: [],
+      lastProcessedShotCount: 0
     };
   }
 
