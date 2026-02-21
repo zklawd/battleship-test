@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import crypto from 'crypto';
+import path from 'path';
 import {
   BOARD_SIZE,
   SHIPS,
@@ -19,15 +20,28 @@ import {
 
 const app = express();
 const httpServer = createServer(app);
+
+// In production, client is served from same origin
+// In dev, allow localhost:5173
+const corsOrigin = process.env.NODE_ENV === 'production'
+  ? false  // Disable CORS in production (same-origin)
+  : (process.env.CLIENT_URL || 'http://localhost:5173');
+
 const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  cors: corsOrigin ? {
+    origin: corsOrigin,
     methods: ['GET', 'POST']
-  }
+  } : undefined
 });
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from client build (production only)
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '../../client/dist');
+  app.use(express.static(clientBuildPath));
+}
 
 // In-memory storage
 const rooms = new Map<string, Room>();
@@ -208,6 +222,13 @@ app.get('/health', (_req, res) => {
     activeRooms: rooms.size
   });
 });
+
+// Serve index.html for all other routes (client-side routing, production only)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+  });
+}
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -514,7 +535,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 httpServer.listen(PORT, () => {
   console.log(`🚢 Battleship server running on http://localhost:${PORT}`);
