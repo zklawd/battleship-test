@@ -198,9 +198,9 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
 
         <div className="grid lg:grid-cols-[1fr_auto] gap-8 items-start">
           {/* Game Board */}
-          <div className="flex flex-col items-center">
-            <div className="bg-gray-800/50 backdrop-blur-sm p-4 md:p-6 rounded-lg shadow-xl border border-gray-700/50">
-              <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))` }}>
+          <div className="flex flex-col items-center w-full">
+            <div className="bg-gray-800/50 backdrop-blur-sm p-2 sm:p-4 md:p-6 rounded-lg shadow-xl border border-gray-700/50 max-w-full overflow-x-auto">
+              <div className="grid gap-0.5 sm:gap-1" style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))` }}>
                 {Array.from({ length: BOARD_SIZE }).map((_, row) =>
                   Array.from({ length: BOARD_SIZE }).map((_, col) => {
                     const cellData = getCellContent(row, col);
@@ -208,7 +208,7 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
                       ? (cellData.isValid ? 'bg-green-500/40 border-green-400' : 'bg-red-500/40 border-red-400')
                       : cellData.hasShip
                       ? `${getShipColor(board[row][col].ship!)} border-white/30`
-                      : 'bg-blue-900/30 border-blue-700/30 hover:bg-blue-700/50';
+                      : 'bg-blue-900/30 border-blue-700/30 hover:bg-blue-700/50 active:bg-blue-600/60';
 
                     return (
                       <button
@@ -217,14 +217,13 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
                         onMouseEnter={() => setHoverCell([row, col])}
                         onMouseLeave={() => setHoverCell(null)}
                         className={`
-                          w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12
-                          border-2 rounded transition-all
+                          border-2 rounded transition-all touch-manipulation
                           ${cellColor}
                           ${selectedShip ? 'cursor-pointer' : 'cursor-default'}
                           ${invalidPlacement && cellData.isPreview ? 'animate-pulse' : ''}
                           active:scale-95
                         `}
-                        style={{ minWidth: '44px', minHeight: '44px' }}
+                        style={{ width: '44px', height: '44px', minWidth: '44px', minHeight: '44px' }}
                       />
                     );
                   })
@@ -233,10 +232,10 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3 mt-6 justify-center">
+            <div className="flex flex-wrap gap-3 mt-6 justify-center w-full px-4">
               <button
                 onClick={handleRandomPlacement}
-                className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 active:scale-95"
+                className="bg-purple-500 hover:bg-purple-600 active:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 active:scale-95 touch-manipulation"
                 style={{ minHeight: '44px' }}
               >
                 🎲 Random
@@ -245,7 +244,7 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
               <button
                 onClick={handleReset}
                 disabled={placedShips.length === 0}
-                className="bg-gray-600 hover:bg-gray-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 active:scale-95 disabled:transform-none disabled:opacity-50"
+                className="bg-gray-600 hover:bg-gray-700 active:bg-gray-800 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 active:scale-95 disabled:transform-none disabled:opacity-50 touch-manipulation"
                 style={{ minHeight: '44px' }}
               >
                 🔄 Reset
@@ -254,7 +253,7 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
               <button
                 onClick={handleReady}
                 disabled={!allShipsPlaced}
-                className="bg-green-500 hover:bg-green-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg transition transform hover:scale-105 active:scale-95 disabled:transform-none disabled:opacity-50 shadow-lg"
+                className="bg-green-500 hover:bg-green-600 active:bg-green-700 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-bold py-3 px-8 rounded-lg transition transform hover:scale-105 active:scale-95 disabled:transform-none disabled:opacity-50 shadow-lg touch-manipulation"
                 style={{ minHeight: '44px' }}
               >
                 ✓ Ready
@@ -262,7 +261,7 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
 
               <button
                 onClick={onCancel}
-                className="bg-red-500/80 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 active:scale-95"
+                className="bg-red-500/80 hover:bg-red-600 active:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition transform hover:scale-105 active:scale-95 touch-manipulation"
                 style={{ minHeight: '44px' }}
               >
                 Cancel
@@ -280,7 +279,7 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
               </div>
               <button
                 onClick={toggleOrientation}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 touch-manipulation"
                 style={{ minHeight: '44px' }}
               >
                 <span className="text-2xl">
@@ -311,12 +310,12 @@ export function ShipPlacement({ mode, onReady, onCancel }: ShipPlacementProps) {
                       onClick={() => selectShip(ship)}
                       disabled={ship.placed}
                       className={`
-                        w-full p-3 rounded-lg border-2 transition transform
+                        w-full p-3 rounded-lg border-2 transition transform touch-manipulation
                         ${ship.placed
                           ? 'bg-gray-700/50 border-gray-600 opacity-50 cursor-not-allowed line-through'
                           : isSelected
                           ? `${color} border-white shadow-lg scale-105`
-                          : `${color}/80 border-transparent hover:border-white/50 hover:scale-102`
+                          : `${color}/80 border-transparent hover:border-white/50 hover:scale-102 active:scale-105`
                         }
                       `}
                       style={{ minHeight: '44px' }}
